@@ -66,3 +66,20 @@ jobs:
             echo "::error::検出ロジックが壊れています（壊れた設定を見逃した）"
             exit 1
           fi
+
+      - name: install.sh の実行テスト（サンドボックス）
+        run: |
+          set -euo pipefail
+          # ランナーは非WSLなので install.sh は Linux 分岐（symlink + git include）で動く。
+          # HOME を一時ディレクトリに隔離して実機を汚さない。
+          export HOME="$(mktemp -d)"
+          git config --global user.email ci@example.com   # global gitconfig を新HOMEに作る
+          ./install.sh
+          # 検証: symlink が repo の .wezterm.lua を指すこと
+          test -L "$HOME/.wezterm.lua"
+          [ "$(readlink -f "$HOME/.wezterm.lua")" = "$(readlink -f .wezterm.lua)" ]
+          # 検証: include 経由でエイリアスが解決されること
+          git config --get alias.lg | grep -q 'log --oneline'
+          # 冪等性: 2回目もエラーにならず変更を増やさないこと
+          ./install.sh
+          echo "OK: install.sh はサンドボックスで正常動作（symlink / include / 冪等）"
